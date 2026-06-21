@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UGC Content Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #080810;
+      --surface: #111120;
+      --card: #16162a;
+      --border: rgba(139, 92, 246, 0.18);
+      --purple: #8b5cf6;
+      --pink: #ec4899;
+      --gradient: linear-gradient(135deg, #8b5cf6, #ec4899);
+      --gradient-soft: linear-gradient(135deg, rgba(139,92,246,0.15), rgba(236,72,153,0.15));
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --subtle: #475569;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      overflow: hidden;
+    }
+
+    /* ── Layout ── */
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .logo {
+      width: 40px;
+      height: 40px;
+      background: var(--gradient);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .header-text h1 {
+      font-size: 18px;
+      font-weight: 800;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.2;
+    }
+
+    .header-text p {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .platform-badges {
+      margin-left: auto;
+      display: flex;
+      gap: 6px;
+    }
+
+    .badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      background: var(--surface);
+      letter-spacing: 0.03em;
+    }
+
+    /* ── Chat area ── */
+    .chat-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      scroll-behavior: smooth;
+    }
+
+    .chat-area::-webkit-scrollbar { width: 4px; }
+    .chat-area::-webkit-scrollbar-track { background: transparent; }
+    .chat-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* ── Messages ── */
+    .msg {
+      display: flex;
+      gap: 10px;
+      animation: fadeUp 0.35s ease forwards;
+      opacity: 0;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .msg.agent { align-items: flex-start; }
+    .msg.user  { align-items: flex-start; flex-direction: row-reverse; }
+
+    .avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .msg.agent .avatar { background: var(--gradient); }
+    .msg.user  .avatar { background: var(--surface); border: 1px solid var(--border); }
+
+    .bubble {
+      max-width: 80%;
+      padding: 12px 16px;
+      border-radius: 18px;
+      font-size: 15px;
+      line-height: 1.55;
+      font-weight: 500;
+    }
+
+    .msg.agent .bubble {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-top-left-radius: 4px;
+      color: var(--text);
+    }
+
+    .msg.user .bubble {
+      background: var(--gradient);
+      border-top-right-radius: 4px;
+      color: #fff;
+    }
+
+    /* ── Typing indicator ── */
+    .typing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 14px 18px;
+    }
+
+    .typing-indicator span {
+      width: 8px;
+      height: 8px;
+      background: var(--purple);
+      border-radius: 50%;
+      animation: bounce 1.2s ease-in-out infinite;
+    }
+
+    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; background: #a78bfa; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; background: var(--pink); }
+
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+      30%            { transform: translateY(-8px); opacity: 1; }
+    }
+
+    /* ── Video type buttons ── */
+    .type-buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+
+    .type-btn {
+      padding: 10px 20px;
+      border-radius: 50px;
+      border: 1.5px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .type-btn:hover {
+      border-color: var(--purple);
+      background: var(--gradient-soft);
+      transform: translateY(-2px);
+    }
+
+    .type-btn.active {
+      background: var(--gradient);
+      border-color: transparent;
+      color: #fff;
+    }
+
+    /* ── Ideas grid ── */
+    .ideas-section {
+      animation: fadeUp 0.4s ease forwards;
+      opacity: 0;
+    }
+
+    .section-label {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--purple);
+      margin-bottom: 12px;
+    }
+
+    .ideas-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .idea-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.22s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .idea-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--gradient-soft);
+      opacity: 0;
+      transition: opacity 0.22s ease;
+    }
+
+    .idea-card:hover {
+      border-color: var(--purple);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 30px rgba(139, 92, 246, 0.2);
+    }
+
+    .idea-card:hover::before { opacity: 1; }
+
+    .idea-card .num {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--purple);
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+      position: relative;
+    }
+
+    .idea-card .title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+      line-height: 1.35;
+      position: relative;
+    }
+
+    .idea-card .angle {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+      margin-bottom: 8px;
+      position: relative;
+    }
+
+    .idea-card .hook-preview {
+      font-size: 12px;
+      color: var(--subtle);
+      font-style: italic;
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+      margin-top: 4px;
+      position: relative;
+      line-height: 1.4;
+    }
+
+    .idea-card .hook-preview::before {
+      content: '"';
+      color: var(--purple);
+      font-style: normal;
+      font-weight: 700;
+      font-size: 14px;
+      margin-right: 2px;
+    }
+
+    .idea-card:nth-child(5) {
+      grid-column: 1 / -1;
+    }
+
+    /* ── Script display ── */
+    .script-section-wrapper {
+      animation: fadeUp 0.4s ease forwards;
+      opacity: 0;
+    }
+
+    .script-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    .script-header {
+      background: var(--gradient);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .script-header h3 {
+      font-size: 16px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .copy-btn {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .copy-btn:hover { background: rgba(255,255,255,0.3); }
+
+    .script-body { padding: 20px; display: flex; flex-direction: column; gap: 18px; }
+
+    .script-block { display: flex; flex-direction: column; gap: 8px; }
+
+    .script-block-label {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .script-block-label.hook   { color: #f59e0b; }
+    .script-block-label.body   { color: #10b981; }
+    .script-block-label.cta    { color: #f43f5e; }
+    .script-block-label.tags   { color: var(--purple); }
+
+    .script-block-content {
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.6;
+      font-weight: 500;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .script-block-content.hook-text {
+      font-size: 16px;
+      font-weight: 700;
+      border-color: rgba(245, 158, 11, 0.3);
+      background: rgba(245, 158, 11, 0.05);
+    }
+
+    .bullets { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+
+    .bullets li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--text);
+      font-weight: 500;
+      line-height: 1.5;
+    }
+
+    .bullets li::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10b981;
+      flex-shrink: 0;
+      margin-top: 7px;
+    }
+
+    .hashtags-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .hashtag {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(139, 92, 246, 0.12);
+      border: 1px solid rgba(139, 92, 246, 0.25);
+      color: #a78bfa;
+    }
+
+    .restart-btn {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1.5px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-top: 4px;
+    }
+
+    .restart-btn:hover {
+      border-color: var(--purple);
+      color: var(--purple);
+      background: var(--gradient-soft);
+    }
+
+    /* ── Input area ── */
+    .input-area {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      background: var(--bg);
+    }
+
+    .input-wrap {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    textarea {
+      flex: 1;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text);
+      resize: none;
+      outline: none;
+      line-height: 1.5;
+      min-height: 48px;
+      max-height: 120px;
+      transition: border-color 0.2s;
+    }
+
+    textarea::placeholder { color: var(--subtle); }
+    textarea:focus { border-color: var(--purple); }
+
+    .send-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      border: none;
+      background: var(--gradient);
+      color: #fff;
+      font-size: 20px;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+
+    .send-btn:hover { opacity: 0.85; transform: scale(1.05); }
+    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .input-area.hidden { display: none; }
+
+    /* ── Loading spinner ── */
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid rgba(139,92,246,0.2);
+      border-top-color: var(--purple);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .generating-msg {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+      animation: fadeUp 0.3s ease forwards;
+    }
+
+    /* ── Mobile ── */
+    @media (max-width: 480px) {
+      .ideas-grid { grid-template-columns: 1fr; }
+      .idea-card:nth-child(5) { grid-column: auto; }
+      .platform-badges { display: none; }
+      header { padding: 16px; }
+      .chat-area { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="logo">🎬</div>
+      <div class="header-text">
+        <h1>UGC Content Agent</h1>
+        <p>Powered by Claude AI</p>
+      </div>
+      <div class="platform-badges">
+        <span class="badge">TikTok</span>
+        <span class="badge">Shorts</span>
+      </div>
+    </header>
+
+    <div class="chat-area" id="chatArea"></div>
+
+    <div class="input-area" id="inputArea">
+      <div class="input-wrap">
+        <textarea
+          id="userInput"
+          placeholder="Type your answer..."
+          rows="1"
+          onkeydown="handleKeyDown(event)"
+          oninput="autoResize(this)"
+        ></textarea>
+        <button class="send-btn" id="sendBtn" onclick="handleSend()">↑</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = 'http://localhost:3001/api';
+
+    const state = {
+      phase: 'mood',
+      answers: { mood: '', activity: '', videoType: '', selectedIdea: null }
+    };
+
+    const chat = document.getElementById('chatArea');
+    const inputArea = document.getElementById('inputArea');
+    const userInput = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+
+    // ── Helpers ──────────────────────────────────────────────
+
+    function scrollBottom() {
+      setTimeout(() => { chat.scrollTop = chat.scrollHeight; }, 50);
+    }
+
+    function autoResize(el) {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    }
+
+    function handleKeyDown(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    }
+
+    function addMsg(role, content, delay = 0) {
+      return new Promise(resolve => {
+        setTimeout(() => {
+          const div = document.createElement('div');
+          div.className = `msg ${role}`;
+          div.innerHTML = `
+            <div class="avatar">${role === 'agent' ? '🤖' : '🙋'}</div>
+            <div class="bubble">${content}</div>
+          `;
+          chat.appendChild(div);
+          scrollBottom();
+          resolve();
+        }, delay);
+      });
+    }
+
+    function showTyping() {
+      const div = document.createElement('div');
+      div.className = 'msg agent';
+      div.id = 'typingIndicator';
+      div.innerHTML = `
+        <div class="avatar">🤖</div>
+        <div class="bubble typing-indicator">
+          <span></span><span></span><span></span>
+        </div>
+      `;
+      chat.appendChild(div);
+      scrollBottom();
+      return div;
+    }
+
+    function removeTyping() {
+      const t = document.getElementById('typingIndicator');
+      if (t) t.remove();
+    }
+
+    function showGenerating(text) {
+      const div = document.createElement('div');
+      div.id = 'generatingMsg';
+      div.className = 'generating-msg';
+      div.innerHTML = `<div class="spinner"></div>${text}`;
+      chat.appendChild(div);
+      scrollBottom();
+    }
+
+    function removeGenerating() {
+      const g = document.getElementById('generatingMsg');
+      if (g) g.remove();
+    }
+
+    function extractJSON(text) {
+      try { return JSON.parse(text); } catch {}
+      const m1 = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (m1) { try { return JSON.parse(m1[1]); } catch {} }
+      const m2 = text.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
+      if (m2) { try { return JSON.parse(m2[1]); } catch {} }
+      return null;
+    }
+
+    // ── API calls ─────────────────────────────────────────────
+
+    async function callAPI(action, answers) {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, answers })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      return res.json();
+    }
+
+    // ── Phase handlers ────────────────────────────────────────
+
+    async function handleSend() {
+      const text = userInput.value.trim();
+      if (!text) return;
+
+      userInput.value = '';
+      userInput.style.height = 'auto';
+      sendBtn.disabled = true;
+
+      await addMsg('user', text);
+
+      if (state.phase === 'mood') {
+        state.answers.mood = text;
+        state.phase = 'activity';
+
+        const t1 = showTyping();
+        let reaction1 = null;
+        try {
+          const data = await callAPI('reactive-response', { question: 'mood', userAnswer: text });
+          reaction1 = data.content;
+        } catch {}
+        t1.remove();
+        if (reaction1) await addMsg('agent', reaction1);
+
+        await agentTypeThen('What\'s been going on in your life lately? Any events, experiences, moments — big or small.', 200);
+        sendBtn.disabled = false;
+        userInput.focus();
+
+      } else if (state.phase === 'activity') {
+        state.answers.activity = text;
+        state.phase = 'type';
+
+        const t2 = showTyping();
+        let reaction2 = null;
+        try {
+          const data = await callAPI('reactive-response', { question: 'activity', userAnswer: text });
+          reaction2 = data.content;
+        } catch {}
+        t2.remove();
+        if (reaction2) await addMsg('agent', reaction2);
+
+        showVideoTypeButtons();
+        inputArea.classList.add('hidden');
+      }
+    }
+
+    async function agentTypeThen(msg, delay = 0) {
+      const t = showTyping();
+      await new Promise(r => setTimeout(r, 900 + delay));
+      t.remove();
+      await addMsg('agent', msg);
+    }
+
+    function showVideoTypeButtons() {
+      setTimeout(async () => {
+        const div = document.createElement('div');
+        div.className = 'msg agent';
+        div.innerHTML = `
+          <div class="avatar">🤖</div>
+          <div style="flex:1">
+            <div class="bubble">What type of video are you feeling?</div>
+            <div class="type-buttons" style="margin-top:10px;margin-left:44px">
+              <button class="type-btn" onclick="selectType('Educational', this)">📚 Educational</button>
+              <button class="type-btn" onclick="selectType('Storytelling', this)">🎭 Storytelling</button>
+              <button class="type-btn" onclick="selectType('Trending', this)">🔥 Trending</button>
+            </div>
+          </div>
+        `;
+        chat.appendChild(div);
+        scrollBottom();
+      }, 1000);
+    }
+
+    async function selectType(type, btn) {
+      document.querySelectorAll('.type-btn').forEach(b => b.disabled = true);
+      btn.classList.add('active');
+
+      state.answers.videoType = type;
+      state.phase = 'generating-ideas';
+
+      await addMsg('user', type);
+      showGenerating('Building your 5 video ideas...');
+      scrollBottom();
+
+      try {
+        const data = await callAPI('generate-ideas', state.answers);
+        removeGenerating();
+
+        const ideas = extractJSON(data.content);
+        if (!ideas || !Array.isArray(ideas)) throw new Error('Invalid ideas response');
+
+        state.phase = 'showing-ideas';
+        showIdeas(ideas);
+      } catch (err) {
+        removeGenerating();
+        await addMsg('agent', `⚠️ Oops — something went wrong: ${err.message}. Make sure the server is running and your API key is set.`);
+      }
+    }
+
+    function showIdeas(ideas) {
+      const section = document.createElement('div');
+      section.className = 'ideas-section';
+
+      const label = document.createElement('div');
+      label.className = 'section-label';
+      label.textContent = '💡 Your 5 Video Ideas — tap to pick one';
+
+      const grid = document.createElement('div');
+      grid.className = 'ideas-grid';
+
+      ideas.forEach((idea, i) => {
+        const card = document.createElement('div');
+        card.className = 'idea-card';
+        card.innerHTML = `
+          <div class="num">0${i + 1}</div>
+          <div class="title">${escapeHTML(idea.title)}</div>
+          <div class="angle">${escapeHTML(idea.angle)}</div>
+          <div class="hook-preview">${escapeHTML(idea.hook)}</div>
+        `;
+        card.onclick = () => selectIdea(idea);
+        grid.appendChild(card);
+      });
+
+      section.appendChild(label);
+      section.appendChild(grid);
+      chat.appendChild(section);
+      scrollBottom();
+    }
+
+    async function selectIdea(idea) {
+      document.querySelectorAll('.idea-card').forEach(c => {
+        c.style.opacity = '0.4';
+        c.style.pointerEvents = 'none';
+      });
+
+      state.answers.selectedIdea = idea;
+      state.phase = 'generating-script';
+
+      await addMsg('user', `"${idea.title}"`);
+      showGenerating('Writing your script...');
+      scrollBottom();
+
+      try {
+        const data = await callAPI('generate-script', state.answers);
+        removeGenerating();
+
+        const script = extractJSON(data.content);
+        if (!script || !script.hook) throw new Error('Invalid script response');
+
+        state.phase = 'showing-script';
+        showScript(script, idea.title);
+      } catch (err) {
+        removeGenerating();
+        await addMsg('agent', `⚠️ Script generation failed: ${err.message}. Try again.`);
+        document.querySelectorAll('.idea-card').forEach(c => {
+          c.style.opacity = '';
+          c.style.pointerEvents = '';
+        });
+      }
+    }
+
+    function showScript(script, title) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'script-section-wrapper';
+
+      const bulletsHTML = (script.contentBullets || [])
+        .map(b => `<li>${escapeHTML(b)}</li>`).join('');
+
+      const hashtagsHTML = (script.hashtags || [])
+        .map(h => `<span class="hashtag">${escapeHTML(h.startsWith('#') ? h : '#' + h)}</span>`).join('');
+
+      const scriptText = buildScriptText(script);
+
+      wrapper.innerHTML = `
+        <div class="script-card">
+          <div class="script-header">
+            <h3>🎬 Your Script — "${escapeHTML(title)}"</h3>
+            <button class="copy-btn" onclick="copyScript(${JSON.stringify(scriptText).replace(/'/g, '&#39;')})">Copy</button>
+          </div>
+          <div class="script-body">
+            <div class="script-block">
+              <div class="script-block-label hook">🪝 Hook (first 3 seconds)</div>
+              <div class="script-block-content hook-text">${escapeHTML(script.hook)}</div>
+            </div>
+            <div class="script-block">
+              <div class="script-block-label body">📋 Content</div>
+              <div class="script-block-content">
+                <ul class="bullets">${bulletsHTML}</ul>
+              </div>
+            </div>
+            <div class="script-block">
+              <div class="script-block-label cta">📣 CTA</div>
+              <div class="script-block-content">${escapeHTML(script.cta)}</div>
+            </div>
+            <div class="script-block">
+              <div class="script-block-label tags"># Hashtags</div>
+              <div class="script-block-content">
+                <div class="hashtags-wrap">${hashtagsHTML}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <button class="restart-btn" onclick="restart()">🔄 Start Over — Create a New Video</button>
+      `;
+
+      chat.appendChild(wrapper);
+      scrollBottom();
+    }
+
+    function buildScriptText(script) {
+      const bullets = (script.contentBullets || []).map((b, i) => `${i+1}. ${b}`).join('\n');
+      const hashtags = (script.hashtags || []).map(h => h.startsWith('#') ? h : '#' + h).join(' ');
+      return `HOOK:\n${script.hook}\n\nCONTENT:\n${bullets}\n\nCTA:\n${script.cta}\n\nHASHTAGS:\n${hashtags}`;
+    }
+
+    function copyScript(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.querySelector('.copy-btn');
+        if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 2000); }
+      });
+    }
+
+    function restart() {
+      state.phase = 'mood';
+      state.answers = { mood: '', activity: '', videoType: '', selectedIdea: null };
+      chat.innerHTML = '';
+      inputArea.classList.remove('hidden');
+      userInput.value = '';
+      sendBtn.disabled = false;
+      init();
+    }
+
+    function escapeHTML(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // ── Init ─────────────────────────────────────────────────
+
+    async function init() {
+      await addMsg('agent', "Hey Nounou! 👋 I'm your UGC Content Agent.", 0);
+
+      const t = showTyping();
+      await new Promise(r => setTimeout(r, 1200));
+      t.remove();
+
+      await addMsg('agent', "Let's build your next viral video — TikTok or Shorts ready. I just need 3 quick things from you.");
+
+      const t2 = showTyping();
+      await new Promise(r => setTimeout(r, 1000));
+      t2.remove();
+
+      await addMsg('agent', "First — <strong>what's your vibe today?</strong><br><span style='color:var(--muted);font-size:13px'>Excited, chill, motivated, stressed, silly, inspired... be real.</span>");
+
+      userInput.focus();
+      sendBtn.disabled = false;
+    }
+
+    init();
+  </script>
+</body>
+</html>
